@@ -25,7 +25,6 @@ def train_epoch_mixed(train_loader, model, criterion_triplet, criterion_classifi
         
         anchor = img.to(device)
         # Get logits and features from the model
-        print(model(anchor).shape)
         anchor_logits, anchor_features = model(anchor)
         _, positive_features = model(positive)
         _, negative_features = model(negative)
