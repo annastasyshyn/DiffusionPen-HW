@@ -22,7 +22,7 @@ class IAMDataset_style(WordLineDataset):
         super().__finalize__()
 
     def main_loader(self, subset, segmentation_level) -> list:
-        def gather_iam_info(self, set='train', level='word'):
+        def gather_iam_info(self, split_name='train', level='word'):
             def _normalize_writer_id(writer_id):
                 writer_id = str(writer_id).strip()
                 no_leading_zeros = writer_id.lstrip('0') or '0'
