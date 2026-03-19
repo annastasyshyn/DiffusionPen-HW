@@ -1,7 +1,6 @@
 import torch
 from torch.utils.data import Dataset
 import numpy as np
-from PIL import ImageOps
 from os.path import isfile
 from skimage.transform import resize
 import os
@@ -153,13 +152,8 @@ class WordLineDataset(Dataset):
         nheight_pos, nwidth_pos = max(4, min(fheight-16, nheight_pos)), max(8, min(fwidth-32, nwidth_pos))
         nheight_neg, nwidth_neg = max(4, min(fheight-16, nheight_neg)), max(8, min(fwidth-32, nwidth_neg))
         
-        #img = image_resize_PIL(img, height=int(1.0 * nheight), width=int(1.0 * nwidth))
-        #img = centered_PIL(img, (fheight, fwidth), border_value=None).convert('L')
-        
-            #image = image.resize((256, 64), Image.ANTIALIAS)
-        if img.width < 256:
-            img = ImageOps.pad(img, size=(256, 64), color= "white")#, centering=(0,0)) uncommment to pad right
-        #print('img', img.mode, img.size)
+        img = image_resize_PIL(img, height=int(1.0 * nheight), width=int(1.0 * nwidth))
+        img = centered_PIL(img, (fheight, fwidth), border_value=255.0)
         
         pixel_values_img = img #self.processor(img, return_tensors="pt").pixel_values
         pixel_values_img = pixel_values_img#.squeeze(0)
@@ -191,7 +185,9 @@ class WordLineDataset(Dataset):
             s_img = image_resize_PIL(s_im, height=int(1.0 * nheight), width=int(1.0 * nwidth))
             s_img = centered_PIL(s_img, (fheight, fwidth), border_value=255.0)
             if self.transforms is not None:
-                s_img_tensor = self.transforms(img)
+                s_img_tensor = self.transforms(s_img)
+            else:
+                s_img_tensor = s_img
             
             st_imgs += [s_img_tensor]
             
