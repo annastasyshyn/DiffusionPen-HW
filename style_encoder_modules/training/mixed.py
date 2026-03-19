@@ -6,6 +6,17 @@ from .losses import performance
 
 
 ############################ MIXED TRAINING ############################################              
+def _split_model_output(output):
+    if isinstance(output, (tuple, list)):
+        if len(output) == 0:
+            raise ValueError("empty tuple/list output")
+        if len(output) == 1:
+            logits = output[0]
+            return logits, logits
+        return output[0], output[1]
+    return output, output
+
+
 def train_epoch_mixed(train_loader, model, criterion_triplet, criterion_classification, optimizer, device, args):
     
     model.train()
@@ -25,9 +36,9 @@ def train_epoch_mixed(train_loader, model, criterion_triplet, criterion_classifi
         
         anchor = img.to(device)
         # Get logits and features from the model
-        anchor_logits, anchor_features = model(anchor)
-        _, positive_features = model(positive)
-        _, negative_features = model(negative)
+        anchor_logits, anchor_features = _split_model_output(model(anchor))
+        _, positive_features = _split_model_output(model(positive))
+        _, negative_features = _split_model_output(model(negative))
         
         _, preds = torch.max(anchor_logits.data, 1)
         n_corrects += (preds == wid.data).sum().item()
@@ -74,9 +85,9 @@ def val_epoch_mixed(val_loader, model, criterion_triplet, criterion_classificati
         negative = data[5].to(device)
         
         anchor = img
-        anchor_logits, anchor_features = model(anchor)
-        _, positive_features = model(positive)
-        _, negative_features = model(negative)
+        anchor_logits, anchor_features = _split_model_output(model(anchor))
+        _, positive_features = _split_model_output(model(positive))
+        _, negative_features = _split_model_output(model(negative))
         
         _, preds = torch.max(anchor_logits.data, 1)
         n_corrects += (preds == wid.data).sum().item()
