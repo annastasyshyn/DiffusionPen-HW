@@ -49,17 +49,17 @@ def main():
                             ])
         
         #train_data = myDataset(dataset_folder, 'train', 'word', fixed_size=(1 * 64, 256), tokenizer=None, text_encoder=None, feat_extractor=None, transforms=train_transform, args=args)
-        train_data = myDataset(dataset_folder, 'train', 'word', fixed_size=(1 * 64, 256), transforms=train_transform)
+        full_data = myDataset(dataset_folder, 'train', 'word', fixed_size=(1 * 64, 256), transforms=train_transform)
         
         #print('len train data', len(train_data))
         #split with torch.utils.data.Subset into train and val
-        validation_size = int(0.2 * len(train_data))
+        validation_size = int(0.2 * len(full_data))
 
         # Calculate the size of the training set
-        train_size = len(train_data) - validation_size
+        train_size = len(full_data) - validation_size
 
         # Use random_split to split the dataset into train and validation sets
-        train_data, val_data = random_split(train_data, [train_size, validation_size], generator=torch.Generator().manual_seed(42))
+        train_data, val_data = random_split(full_data, [train_size, validation_size], generator=torch.Generator().manual_seed(42))
         print('len train data', len(train_data))
         print('len val data', len(val_data))
         
@@ -73,7 +73,8 @@ def main():
         else:
             print('No validation data')
             
-        style_classes = 339
+        max_label = max(sample[2] for sample in full_data.data) if len(full_data.data) > 0 else -1
+        style_classes = max(full_data.wclasses, int(max_label) + 1)
     
     else:
         print('You need to add your own dataset and define the number of style classes!!!')

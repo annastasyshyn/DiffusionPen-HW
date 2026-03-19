@@ -30,7 +30,7 @@ def train_epoch_mixed(train_loader, model, criterion_triplet, criterion_classifi
     for i, data in enumerate(pbar):
         
         img = data[0]
-        wid = data[3].to(device)
+        wid = data[3].to(device).long()
         positive = data[4].to(device)
         negative = data[5].to(device)
         
@@ -39,6 +39,13 @@ def train_epoch_mixed(train_loader, model, criterion_triplet, criterion_classifi
         anchor_logits, anchor_features = _split_model_output(model(anchor))
         _, positive_features = _split_model_output(model(positive))
         _, negative_features = _split_model_output(model(negative))
+
+        num_classes = anchor_logits.size(1)
+        if wid.numel() > 0 and (wid.min() < 0 or wid.max() >= num_classes):
+            raise ValueError(
+                f"Label out of range for classification head: "
+                f"min={wid.min().item()}, max={wid.max().item()}, num_classes={num_classes}"
+            )
         
         _, preds = torch.max(anchor_logits.data, 1)
         n_corrects += (preds == wid.data).sum().item()
@@ -80,7 +87,7 @@ def val_epoch_mixed(val_loader, model, criterion_triplet, criterion_classificati
     for i, data in enumerate(pbar):
         
         img = data[0].to(device)
-        wid = data[3].to(device)
+        wid = data[3].to(device).long()
         positive = data[4].to(device)
         negative = data[5].to(device)
         
@@ -88,6 +95,13 @@ def val_epoch_mixed(val_loader, model, criterion_triplet, criterion_classificati
         anchor_logits, anchor_features = _split_model_output(model(anchor))
         _, positive_features = _split_model_output(model(positive))
         _, negative_features = _split_model_output(model(negative))
+
+        num_classes = anchor_logits.size(1)
+        if wid.numel() > 0 and (wid.min() < 0 or wid.max() >= num_classes):
+            raise ValueError(
+                f"Label out of range for classification head: "
+                f"min={wid.min().item()}, max={wid.max().item()}, num_classes={num_classes}"
+            )
         
         _, preds = torch.max(anchor_logits.data, 1)
         n_corrects += (preds == wid.data).sum().item()
