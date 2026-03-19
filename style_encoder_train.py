@@ -63,10 +63,11 @@ def main():
         print('len train data', len(train_data))
         print('len val data', len(val_data))
         
-        train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=4)
+        num_workers = min(2, os.cpu_count() or 1)
+        train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=num_workers)
         
 
-        val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
+        val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=num_workers)
         if val_loader is not None:
             print('Val data')
         else:
