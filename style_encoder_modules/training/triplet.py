@@ -90,14 +90,17 @@ def train_triplet(model, train_loader, val_loader, criterion, optimizer, schedul
         model.train()
         train_loss = train_epoch_triplet(train_loader, model, criterion, optimizer, device, args)
         print("Epoch: {}/{}".format(epoch_i+1, args.epochs))
-        
-        model.eval()
-        with torch.no_grad():
-            val_loss = val_epoch_triplet(val_loader, model, criterion, optimizer, device, args)
-        
-        if val_loss < best_loss:
-            best_loss =val_loss
+
+        if val_loader is not None:
+            model.eval()
+            with torch.no_grad():
+                val_loss = val_epoch_triplet(val_loader, model, criterion, optimizer, device, args)
+
+            if val_loss < best_loss:
+                best_loss = val_loss
+                torch.save(model.state_dict(), f'{args.save_path}/triplet_{args.dataset}_{args.model}.pth')
+
+            scheduler.step()
+        else:
             torch.save(model.state_dict(), f'{args.save_path}/triplet_{args.dataset}_{args.model}.pth')
-            print("Saved Best Model!")
-        
-        scheduler.step(val_loss)
+            scheduler.step(train_loss)

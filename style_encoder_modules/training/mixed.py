@@ -132,14 +132,17 @@ def train_mixed(model, train_loader, val_loader, criterion_triplet, criterion_cl
         model.train()
         train_loss = train_epoch_mixed(train_loader, model, criterion_triplet, criterion_classification, optimizer, device, args)
         print("Epoch: {}/{}".format(epoch_i+1, args.epochs))
-        
-        model.eval()
-        with torch.no_grad():
-            val_loss = val_epoch_mixed(val_loader, model, criterion_triplet, criterion_classification, optimizer, device, args)
-        
-        if val_loss < best_loss:
-            best_loss =val_loss
+
+        if val_loader is not None:
+            model.eval()
+            with torch.no_grad():
+                val_loss = val_epoch_mixed(val_loader, model, criterion_triplet, criterion_classification, optimizer, device, args)
+
+            if val_loss < best_loss:
+                best_loss = val_loss
+                torch.save(model.state_dict(), f'{args.save_path}/mixed_{args.dataset}_{args.model}.pth')
+
+            scheduler.step()
+        else:
             torch.save(model.state_dict(), f'{args.save_path}/mixed_{args.dataset}_{args.model}.pth')
-            print("Saved Best Model!")
-        
-        scheduler.step(val_loss)
+            scheduler.step()
