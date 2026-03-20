@@ -16,7 +16,9 @@ def _remap_val_to_train_label_space(train_ds, val_ds):
     remapped_val_data = []
     skipped_unseen = 0
 
-    for (img, transcr, _, img_path), raw_writer_id in zip(val_ds.data, val_ds.initial_writer_ids):
+    for (img, transcr, _, img_path), raw_writer_id in zip(
+        val_ds.data, val_ds.initial_writer_ids
+    ):
         if raw_writer_id in train_map:
             remapped_label = int(train_map[raw_writer_id])
             remapped_val_data.append((img, transcr, remapped_label, img_path))
@@ -63,7 +65,9 @@ def evaluate(args):
         num_workers=num_workers,
     )
 
-    max_label = max(sample[2] for sample in train_ds.data) if len(train_ds.data) > 0 else -1
+    max_label = (
+        max(sample[2] for sample in train_ds.data) if len(train_ds.data) > 0 else -1
+    )
     num_classes = max(train_ds.wclasses, int(max_label) + 1)
 
     model = ImageEncoder(

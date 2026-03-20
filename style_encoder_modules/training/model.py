@@ -8,7 +8,7 @@ class Mixed_Encoder(nn.Module):
     """
 
     def __init__(
-        self, model_name='resnet50', num_classes=339, pretrained=True, trainable=True
+        self, model_name="resnet50", num_classes=339, pretrained=True, trainable=True
     ):
         super().__init__()
         self.model = timm.create_model(
@@ -18,7 +18,7 @@ class Mixed_Encoder(nn.Module):
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
 
         # Create the classifier
-        if hasattr(self.model, 'num_features'):
+        if hasattr(self.model, "num_features"):
             num_features = self.model.num_features
         else:
             # Fallback, can be adjusted based on the specific model
@@ -28,6 +28,7 @@ class Mixed_Encoder(nn.Module):
 
         for p in self.model.parameters():
             p.requires_grad = trainable
+
     def forward(self, x):
         # Extract features
         features = self.model(x)
@@ -39,4 +40,4 @@ class Mixed_Encoder(nn.Module):
         logits = self.classifier(pooled_features)
         # print('logits', logits.shape)
         # print('pooled_features', pooled_features.shape)
-        return logits, pooled_features  
+        return logits, pooled_features
