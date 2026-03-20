@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torchvision import transforms
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 import os
 import argparse
 import torch.optim as optim
@@ -49,32 +49,34 @@ def main():
                             ])
         
         #train_data = myDataset(dataset_folder, 'train', 'word', fixed_size=(1 * 64, 256), tokenizer=None, text_encoder=None, feat_extractor=None, transforms=train_transform, args=args)
-        full_data = myDataset(dataset_folder, 'train', 'word', fixed_size=(1 * 64, 256), transforms=train_transform)
+        # full_data = myDataset(dataset_folder, 'train', 'word', fixed_size=(1 * 64, 256), transforms=train_transform)
+        train_data = myDataset(dataset_folder, 'train', 'word', fixed_size=(1 * 64, 256), transforms=train_transform)
         
         #print('len train data', len(train_data))
         #split with torch.utils.data.Subset into train and val
-        validation_size = int(0.2 * len(full_data))
+        # validation_size = int(0.2 * len(full_data))
 
         # Calculate the size of the training set
-        train_size = len(full_data) - validation_size
+        # train_size = len(full_data) - validation_size
 
         # Use random_split to split the dataset into train and validation sets
-        train_data, val_data = random_split(full_data, [train_size, validation_size], generator=torch.Generator().manual_seed(42))
-        print('len train data', len(train_data))
-        print('len val data', len(val_data))
+        # train_data, val_data = random_split(full_data, [train_size, validation_size], generator=torch.Generator().manual_seed(42))
+        # print('len train data', len(train_data))
+        # print('len val data', len(val_data))
         
         num_workers = min(2, os.cpu_count() or 1)
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=num_workers)
         
-
-        val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=num_workers)
-        if val_loader is not None:
-            print('Val data')
-        else:
-            print('No validation data')
-            
-        max_label = max(sample[2] for sample in full_data.data) if len(full_data.data) > 0 else -1
-        style_classes = max(full_data.wclasses, int(max_label) + 1)
+        # val_data/val_loader in this training script.
+        # val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=num_workers)
+        val_loader = None
+        print('len train data', len(train_data))
+        print('Validation disabled in training script (run separately).')
+        
+        # max_label = max(sample[2] for sample in full_data.data) if len(full_data.data) > 0 else -1
+        # style_classes = max(full_data.wclasses, int(max_label) + 1)
+        max_label = max(sample[2] for sample in train_data.data) if len(train_data.data) > 0 else -1
+        style_classes = max(train_data.wclasses, int(max_label) + 1)
     
     else:
         print('You need to add your own dataset and define the number of style classes!!!')

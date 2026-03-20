@@ -66,17 +66,23 @@ class WordLineDataset(Dataset):
         self.data = data
         #print('data', self.data)
         self.initial_writer_ids = [d[2] for d in data]
-        
-        writer_ids,_  = np.unique([d[2] for d in data], return_inverse=True)
-       
+
+        writer_ids, writer_indices = np.unique([d[2] for d in data], return_inverse=True)
+
+        self.data = [
+            (img, transcr, int(writer_idx), img_path)
+            for (img, transcr, _, img_path), writer_idx in zip(data, writer_indices)
+        ]
+
         self.writer_ids = writer_ids
+        self.writer_id_to_index = {wid: idx for idx, wid in enumerate(writer_ids)}
         
         self.wclasses = len(writer_ids)
         print('Number of writers', self.wclasses)
         if self.character_classes is None:
             res = set()
              #compute character classes given input transcriptions
-            for _,transcr,_,_ in tqdm(data):
+            for _,transcr,_,_ in tqdm(self.data):
                 #print('legth transcr = ', len(transcr))
                 res.update(list(transcr))
                 self.max_transcr_len = max(self.max_transcr_len, len(transcr))
