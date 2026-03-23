@@ -1,6 +1,7 @@
 import numpy as np
 from PIL import Image
 import json
+import os
 
 from .word_line_dataset import WordLineDataset
 from .image_utils import image_resize_PIL
@@ -75,8 +76,20 @@ class IAMDataset_style(WordLineDataset):
             gt = []
             form_writer_dict = {}
 
-            dict_path = f"./writers_dict_{subset}.json"
-            # open dict file
+            dict_candidates = [f"./writers_dict_{subset}.json"]
+            if subset == "val":
+                dict_candidates.extend(
+                    ["./writers_dict_test.json", "./writers_dict_train.json"]
+                )
+            dict_path = next(
+                (p for p in dict_candidates if os.path.exists(p)),
+                None,
+            )
+            if dict_path is None:
+                raise FileNotFoundError(
+                    "Could not find any writer dictionary file. Tried: "
+                    + ", ".join(dict_candidates)
+                )
             with open(dict_path, "r") as f:
                 wr_dict = json.load(f)
             reverse_wr_dict = {
@@ -146,7 +159,7 @@ class IAMDataset_style(WordLineDataset):
             if missing_writers:
                 print(
                     f"Warning: skipped {len(missing_writers)} writer ids "
-                    f"missing from writers_dict_{subset}.json"
+                    f"missing from {os.path.basename(dict_path)}"
                 )
             return gt
 

@@ -28,7 +28,8 @@ def load_metafile(path: Path):
 
 def build_writer_from_filename(filename: str):
     stem = Path(filename).stem
-    return stem.split("-")[0]
+    parts = stem.split("-")
+    return parts[1] if len(parts) > 1 else parts[0]
 
 
 def main():
@@ -137,22 +138,24 @@ def main():
         "\n".join(test_ids.tolist()), encoding="utf-8"
     )
 
-    def writer_map(ids):
-        writers = sorted({forms_map[fid] for fid in ids})
+    split_to_ids = {
+        "train": train_ids.tolist(),
+        "val": val_ids.tolist(),
+        "test": test_ids.tolist(),
+    }
+
+    def writer_map_from_form_ids(form_ids):
+        writers = sorted({forms_map[fid] for fid in form_ids if fid in forms_map})
         return {str(w): i for i, w in enumerate(writers)}
 
-    Path("writers_dict_train.json").write_text(
-        json.dumps(writer_map(train_ids), ensure_ascii=False),
-        encoding="utf-8",
-    )
-    Path("writers_dict_val.json").write_text(
-        json.dumps(writer_map(val_ids), ensure_ascii=False),
-        encoding="utf-8",
-    )
-    Path("writers_dict_test.json").write_text(
-        json.dumps(writer_map(test_ids), ensure_ascii=False),
-        encoding="utf-8",
-    )
+    dict_targets = [Path("."), split_dir]
+    for split_name, form_ids in split_to_ids.items():
+        payload = json.dumps(writer_map_from_form_ids(form_ids), ensure_ascii=False)
+        for target_dir in dict_targets:
+            target_dir.mkdir(parents=True, exist_ok=True)
+            (target_dir / f"writers_dict_{split_name}.json").write_text(
+                payload, encoding="utf-8"
+            )
 
     print(f"Rows in metafile: {len(rows)}")
     print(f"Images copied: {copied}")
@@ -163,7 +166,8 @@ def main():
     print(f"Wrote: {words_path}")
     print(f"Wrote split files in: {split_dir}")
     print(
-        "Wrote: writers_dict_train.json, writers_dict_val.json, writers_dict_test.json"
+        "Wrote writer maps for train/val/test to: "
+        f"{Path('.').resolve()} and {split_dir.resolve()}"
     )
 
 
