@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 
 import torch
@@ -11,22 +12,10 @@ from style_encoder_modules.data import IAMDataset_style
 from style_encoder_modules.training.mixed import _split_model_output
 
 
-def _remap_val_to_train_label_space(train_ds, val_ds):
-    train_map = train_ds.writer_id_to_index
-    remapped_val_data = []
-    skipped_unseen = 0
-
-    for (img, transcr, _, img_path), raw_writer_id in zip(
-        val_ds.data, val_ds.initial_writer_ids
-    ):
-        if raw_writer_id in train_map:
-            remapped_label = int(train_map[raw_writer_id])
-            remapped_val_data.append((img, transcr, remapped_label, img_path))
-        else:
-            skipped_unseen += 1
-
-    val_ds.data = remapped_val_data
-    return skipped_unseen
+def load_split_indices(path):
+    with open(path) as f:
+        obj = json.load(f)
+    return obj["train"], obj["val"]
 
 
 def evaluate(args):
@@ -36,27 +25,20 @@ def evaluate(args):
         [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
 
-    train_ds = IAMDataset_style(
+    full_ds = IAMDataset_style(
         args.data_root,
         "train",
         "word",
         fixed_size=(64, 256),
         transforms=tfm,
     )
-    val_ds = IAMDataset_style(
-        args.data_root,
-        "val",
-        "word",
-        fixed_size=(64, 256),
-        transforms=tfm,
-    )
 
-    skipped_unseen = _remap_val_to_train_label_space(train_ds, val_ds)
-    print(f"Validation samples kept: {len(val_ds)}")
-    print(f"Skipped unseen writer samples: {skipped_unseen}")
+    _, val_idx = load_split_indices(args.split_file)
+    val_ds = torch.utils.data.Subset(full_ds, val_idx)
+    print(f"Validation samples: {len(val_ds)}")
 
     if len(val_ds) == 0:
-        raise RuntimeError("No validation samples left after label remapping.")
+        raise RuntimeError("No validation samples.")
 
     val_loader = DataLoader(
         val_ds,
@@ -65,10 +47,8 @@ def evaluate(args):
         num_workers=num_workers,
     )
 
-    max_label = (
-        max(sample[2] for sample in train_ds.data) if len(train_ds.data) > 0 else -1
-    )
-    num_classes = max(train_ds.wclasses, int(max_label) + 1)
+    with open("writers_dict_train.json") as _f:
+        num_classes = len(json.load(_f))
 
     model = ImageEncoder(
         model_name=args.model,
@@ -125,6 +105,12 @@ def main():
     parser.add_argument("--model", type=str, default="mobilenetv2_100")
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--device", type=str, default="cuda:0")
+    parser.add_argument(
+        "--split_file",
+        type=str,
+        default="split_indices.json",
+        help="JSON file with train/val index lists produced by the notebook",
+    )
     args = parser.parse_args()
     evaluate(args)
 

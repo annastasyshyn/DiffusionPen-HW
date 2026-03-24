@@ -24,7 +24,7 @@ class IAMDataset_style(WordLineDataset):
         self.word_file = "./iam_data/ascii/words.txt".format(
             self.basefolder, self.setname
         )
-        self.word_path = "{}/words".format(self.basefolder, self.setname)
+        self.word_path = os.path.join(self.basefolder, "words")
         self.line_path = "{}/lines".format(self.basefolder, self.setname)
         self.forms = "./iam_data/ascii/forms.txt"
         # self.stopwords_path = '{}/{}/iam-stopwords'.format(self.basefolder, self.setname)

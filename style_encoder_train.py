@@ -1,7 +1,9 @@
+import json
+
 import torch
 import torch.nn as nn
 from torchvision import transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 import os
 import argparse
 import torch.optim as optim
@@ -13,6 +15,12 @@ from style_encoder_modules.training import (
     train_classification,
     train_triplet as train,
 )
+
+
+def load_split_indices(path):
+    with open(path) as f:
+        obj = json.load(f)
+    return obj["train"], obj["val"]
 
 
 def main():
@@ -53,61 +61,48 @@ def main():
         default="mixed",
         help="mixed for DiffusionPen, triplet for DiffusionPen-triplet, or classification for DiffusionPen-triplet",
     )
+    parser.add_argument(
+        "--split_file",
+        type=str,
+        default="split_indices.json",
+        help="JSON file with train/val index lists produced by the notebook",
+    )
     args = parser.parse_args()
 
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
-    # ========= Data augmentation and normalization for training =====#
-    if os.path.exists(args.save_path) == False:
+    if not os.path.exists(args.save_path):
         os.makedirs(args.save_path)
 
     if args.dataset == "iam":
 
-        myDataset = IAMDataset_style
-        # dataset_folder = '/usr/share/datasets_ianos'
-        dataset_folder = "/path/to/iam_data/"
-        aug_transforms = [lambda x: affine_transformation(x, s=0.1)]
+        dataset_folder = "./iam_data/"
 
         train_transform = transforms.Compose(
             [
-                # transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
-                transforms.Normalize(
-                    (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
-                ),  # transforms.Normalize((0.5,), (0.5,)),  #
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
             ]
         )
 
-        val_transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
-                ),  # transforms.Normalize((0.5,), (0.5,)),  #
-            ]
-        )
-
-        # train_data = myDataset(dataset_folder, 'train', 'word', fixed_size=(1 * 64, 256), tokenizer=None, text_encoder=None, feat_extractor=None, transforms=train_transform, args=args)
-        # full_data = myDataset(dataset_folder, 'train', 'word', fixed_size=(1 * 64, 256), transforms=train_transform)
-        train_data = myDataset(
+        full_data = IAMDataset_style(
             dataset_folder,
             "train",
             "word",
-            fixed_size=(1 * 64, 256),
+            fixed_size=(64, 256),
             transforms=train_transform,
         )
 
-        # print('len train data', len(train_data))
-        # split with torch.utils.data.Subset into train and val
-        # validation_size = int(0.2 * len(full_data))
+        train_idx, val_idx = load_split_indices(args.split_file)
+        assert max(max(train_idx), max(val_idx)) < len(full_data), (
+            f"Split indices exceed dataset size ({len(full_data)})"
+        )
+        train_data = torch.utils.data.Subset(full_data, train_idx)
+        val_data = torch.utils.data.Subset(full_data, val_idx)
 
-        # Calculate the size of the training set
-        # train_size = len(full_data) - validation_size
-
-        # Use random_split to split the dataset into train and validation sets
-        # train_data, val_data = random_split(full_data, [train_size, validation_size], generator=torch.Generator().manual_seed(42))
-        # print('len train data', len(train_data))
-        # print('len val data', len(val_data))
+        print(f"len full data {len(full_data)}")
+        print(f"len train data {len(train_data)}")
+        print(f"len val data {len(val_data)}")
 
         num_workers = min(2, os.cpu_count() or 1)
         train_loader = DataLoader(
@@ -116,21 +111,15 @@ def main():
             shuffle=True,
             num_workers=num_workers,
         )
-
-        # val_data/val_loader in this training script.
-        # val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=num_workers)
-        val_loader = None
-        print("len train data", len(train_data))
-        print("Validation disabled in training script (run separately).")
-
-        # max_label = max(sample[2] for sample in full_data.data) if len(full_data.data) > 0 else -1
-        # style_classes = max(full_data.wclasses, int(max_label) + 1)
-        max_label = (
-            max(sample[2] for sample in train_data.data)
-            if len(train_data.data) > 0
-            else -1
+        val_loader = DataLoader(
+            val_data,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=num_workers,
         )
-        style_classes = max(train_data.wclasses, int(max_label) + 1)
+
+        with open("writers_dict_train.json") as _f:
+            style_classes = len(json.load(_f))
 
     else:
         print(
