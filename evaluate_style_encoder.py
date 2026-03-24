@@ -4,18 +4,12 @@ import os
 
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 
 from feature_extractor import ImageEncoder
 from style_encoder_modules.data import IAMDataset_style
 from style_encoder_modules.training.mixed import _split_model_output
-
-
-def load_split_indices(path):
-    with open(path) as f:
-        obj = json.load(f)
-    return obj["train"], obj["val"]
 
 
 def evaluate(args):
@@ -33,8 +27,12 @@ def evaluate(args):
         transforms=tfm,
     )
 
-    _, val_idx = load_split_indices(args.split_file)
-    val_ds = torch.utils.data.Subset(full_ds, val_idx)
+    n_val = int(len(full_ds) * args.val_fraction)
+    n_train = len(full_ds) - n_val
+    _, val_ds = random_split(
+        full_ds, [n_train, n_val],
+        generator=torch.Generator().manual_seed(args.split_seed),
+    )
     print(f"Validation samples: {len(val_ds)}")
 
     if len(val_ds) == 0:
@@ -106,10 +104,10 @@ def main():
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument(
-        "--split_file",
-        type=str,
-        default="split_indices.json",
-        help="JSON file with train/val index lists produced by the notebook",
+        "--split_seed", type=int, default=42, help="random seed for train/val split"
+    )
+    parser.add_argument(
+        "--val_fraction", type=float, default=0.2, help="fraction of data for validation"
     )
     args = parser.parse_args()
     evaluate(args)

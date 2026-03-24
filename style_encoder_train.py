@@ -17,12 +17,6 @@ from style_encoder_modules.training import (
 )
 
 
-def load_split_indices(path):
-    with open(path) as f:
-        obj = json.load(f)
-    return obj["train"], obj["val"]
-
-
 def main():
     """Main function"""
     parser = argparse.ArgumentParser(description="Train Style Encoder")
@@ -62,10 +56,10 @@ def main():
         help="mixed for DiffusionPen, triplet for DiffusionPen-triplet, or classification for DiffusionPen-triplet",
     )
     parser.add_argument(
-        "--split_file",
-        type=str,
-        default="split_indices.json",
-        help="JSON file with train/val index lists produced by the notebook",
+        "--split_seed", type=int, default=42, help="random seed for train/val split"
+    )
+    parser.add_argument(
+        "--val_fraction", type=float, default=0.2, help="fraction of data for validation"
     )
     args = parser.parse_args()
 
@@ -93,12 +87,12 @@ def main():
             transforms=train_transform,
         )
 
-        train_idx, val_idx = load_split_indices(args.split_file)
-        assert max(max(train_idx), max(val_idx)) < len(full_data), (
-            f"Split indices exceed dataset size ({len(full_data)})"
+        n_val = int(len(full_data) * args.val_fraction)
+        n_train = len(full_data) - n_val
+        train_data, val_data = random_split(
+            full_data, [n_train, n_val],
+            generator=torch.Generator().manual_seed(args.split_seed),
         )
-        train_data = torch.utils.data.Subset(full_data, train_idx)
-        val_data = torch.utils.data.Subset(full_data, val_idx)
 
         print(f"len full data {len(full_data)}")
         print(f"len train data {len(train_data)}")
