@@ -4,6 +4,11 @@ import shutil
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
+
+
+CHUNK_WIDTH = 250
+MIN_CHUNK_WIDTH = 100
 
 
 def load_metafile(path: Path):
@@ -30,6 +35,22 @@ def build_writer_from_filename(filename: str):
     stem = Path(filename).stem
     parts = stem.split("-")
     return parts[1] if len(parts) > 1 else parts[0]
+
+
+def slice_line_image(img):
+    """Slice a wide line image into word-sized chunks."""
+    w, h = img.size
+    if w <= CHUNK_WIDTH:
+        return [img]
+    chunks = []
+    x = 0
+    while x < w:
+        x_end = min(x + CHUNK_WIDTH, w)
+        if w - x_end < MIN_CHUNK_WIDTH and x_end < w:
+            x_end = w
+        chunks.append(img.crop((x, 0, x_end, h)))
+        x = x_end
+    return chunks
 
 
 def main():
@@ -69,7 +90,7 @@ def main():
     rows = load_metafile(metafile)
     forms_map = {}
     words_lines = []
-    copied = 0
+    total_chunks = 0
     missing_images = 0
 
     for filename, transcription in rows:
@@ -86,24 +107,31 @@ def main():
             missing_images += 1
             continue
 
-        # Expected by IAMDataset_style loader:
-        # root/words/<p0>/<p0-p1>/<full_name>.png
+        img = Image.open(src_img)
+        chunks = slice_line_image(img)
+
         p0 = name_parts[0]
         p01 = "-".join(name_parts[:2])
-        dst_img = words_root / p0 / p01 / f"{stem}.png"
-        dst_img.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src_img, dst_img)
-        copied += 1
+        dst_dir = words_root / p0 / p01
+        dst_dir.mkdir(parents=True, exist_ok=True)
 
         forms_map.setdefault(form_id, writer_id)
         if not transcription:
             transcription = "sample"
-        # IAM words.txt compatibility: transcription starts at token index 8
-        words_lines.append(f"{stem} ok 0 0 0 0 0 0 {transcription}")
 
-    if copied == 0:
+        line_part = name_parts[3]
+        for ci, chunk in enumerate(chunks):
+            chunk_id = f"{line_part}{ci:02d}"
+            chunk_stem = f"{name_parts[0]}-{name_parts[1]}-{name_parts[2]}-{chunk_id}"
+            chunk.save(dst_dir / f"{chunk_stem}.png")
+            total_chunks += 1
+            words_lines.append(
+                f"{chunk_stem} ok 0 0 0 0 0 0 {transcription}"
+            )
+
+    if total_chunks == 0:
         raise RuntimeError(
-            "No images copied. Check --lines_dir and metafile filenames."
+            "No images created. Check --lines_dir and metafile filenames."
         )
 
     forms_path = ascii_dir / "forms.txt"
@@ -114,19 +142,19 @@ def main():
     )
     words_path.write_text("\n".join(words_lines), encoding="utf-8")
 
-    form_ids = np.array(sorted(forms_map.keys()))
+    all_form_ids = np.array(sorted(forms_map.keys()))
     rng = np.random.default_rng(args.seed)
-    perm = rng.permutation(len(form_ids))
+    perm = rng.permutation(len(all_form_ids))
 
-    n_test = int(len(form_ids) * args.test_fraction)
-    n_val = int(len(form_ids) * args.val_fraction)
-    n_train = len(form_ids) - n_val - n_test
+    n_test = int(len(all_form_ids) * args.test_fraction)
+    n_val = int(len(all_form_ids) * args.val_fraction)
+    n_train = len(all_form_ids) - n_val - n_test
     if n_train <= 0:
         raise RuntimeError("Invalid split fractions produce empty train split.")
 
-    train_ids = form_ids[perm[:n_train]]
-    val_ids = form_ids[perm[n_train : n_train + n_val]]
-    test_ids = form_ids[perm[n_train + n_val :]]
+    train_ids = all_form_ids[perm[:n_train]]
+    val_ids = all_form_ids[perm[n_train : n_train + n_val]]
+    test_ids = all_form_ids[perm[n_train + n_val :]]
 
     (split_dir / "train_val.uttlist").write_text(
         "\n".join(train_ids.tolist()), encoding="utf-8"
@@ -144,13 +172,13 @@ def main():
         "test": test_ids.tolist(),
     }
 
-    def writer_map_from_form_ids(form_ids):
-        writers = sorted({forms_map[fid] for fid in form_ids if fid in forms_map})
+    def writer_map_from_form_ids(fids):
+        writers = sorted({forms_map[fid] for fid in fids if fid in forms_map})
         return {str(w): i for i, w in enumerate(writers)}
 
     dict_targets = [Path("."), split_dir]
-    for split_name, form_ids in split_to_ids.items():
-        payload = json.dumps(writer_map_from_form_ids(form_ids), ensure_ascii=False)
+    for split_name, fids in split_to_ids.items():
+        payload = json.dumps(writer_map_from_form_ids(fids), ensure_ascii=False)
         for target_dir in dict_targets:
             target_dir.mkdir(parents=True, exist_ok=True)
             (target_dir / f"writers_dict_{split_name}.json").write_text(
@@ -158,9 +186,10 @@ def main():
             )
 
     print(f"Rows in metafile: {len(rows)}")
-    print(f"Images copied: {copied}")
+    print(f"Line images processed: {len(rows) - missing_images}")
+    print(f"Word chunks created: {total_chunks}")
     print(f"Missing images: {missing_images}")
-    print(f"Forms total: {len(form_ids)}")
+    print(f"Forms total: {len(all_form_ids)}")
     print(f"Train/Val/Test forms: {len(train_ids)}/{len(val_ids)}/{len(test_ids)}")
     print(f"Wrote: {forms_path}")
     print(f"Wrote: {words_path}")
