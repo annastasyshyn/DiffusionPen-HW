@@ -104,18 +104,17 @@ def main():
         print(f"len train data {len(train_data)}")
         print(f"len val data {len(val_data)}")
 
-        num_workers = min(2, os.cpu_count() or 1)
         train_loader = DataLoader(
             train_data,
             batch_size=args.batch_size,
             shuffle=True,
-            num_workers=num_workers,
+            num_workers=0,
         )
         val_loader = DataLoader(
             val_data,
             batch_size=args.batch_size,
             shuffle=False,
-            num_workers=num_workers,
+            num_workers=0,
         )
 
         _wr_dict_candidates = [
@@ -142,10 +141,6 @@ def main():
             ]
         )
 
-        # Load train and val as separate instances split at the form boundary.
-        # This avoids the data leakage that occurs when random_split is applied
-        # at the chunk level: adjacent chunks from the same handwritten line would
-        # end up on both sides of the split.
         train_data = UkrDataset_style(
             dataset_folder,
             "train",
@@ -172,18 +167,17 @@ def main():
         print(f"len val data {len(val_data)}")
         print(f"style classes (num writers): {style_classes}")
 
-        num_workers = min(2, os.cpu_count() or 1)
         train_loader = DataLoader(
             train_data,
             batch_size=args.batch_size,
             shuffle=True,
-            num_workers=num_workers,
+            num_workers=0,
         )
         val_loader = DataLoader(
             val_data,
             batch_size=args.batch_size,
             shuffle=False,
-            num_workers=num_workers,
+            num_workers=0,
         )
 
     else:
