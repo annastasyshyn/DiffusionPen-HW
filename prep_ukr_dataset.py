@@ -10,6 +10,7 @@ from PIL import Image
 TARGET_HEIGHT = 60
 CHUNK_WIDTH = 192
 MIN_CHUNK_WIDTH = 64
+BLANK_RATIO_THRESHOLD = 0.95
 
 
 def load_metafile(path: Path):
@@ -36,6 +37,25 @@ def build_writer_from_filename(filename: str):
     stem = Path(filename).stem
     parts = stem.split("-")
     return parts[1] if len(parts) > 1 else parts[0]
+
+
+def trim_whitespace(img, bg_threshold=240, min_width=MIN_CHUNK_WIDTH):
+    """Crop trailing blank columns from the right side of a line image."""
+    arr = np.array(img.convert("L"))
+    col_means = arr.mean(axis=0)
+    rightmost = len(col_means) - 1
+    while rightmost > 0 and col_means[rightmost] >= bg_threshold:
+        rightmost -= 1
+    crop_w = max(min_width, rightmost + 1)
+    if crop_w < img.width:
+        return img.crop((0, 0, crop_w, img.height))
+    return img
+
+
+def is_mostly_blank(img, bg_threshold=240, ratio=BLANK_RATIO_THRESHOLD):
+    """Return True if the chunk is almost entirely blank."""
+    arr = np.array(img.convert("L"))
+    return (arr >= bg_threshold).mean() >= ratio
 
 
 def slice_line_image(img):
@@ -91,6 +111,7 @@ def main():
     forms_map = {}
     words_lines = []
     total_chunks = 0
+    blank_skipped = 0
     missing_images = 0
 
     for filename, transcription in rows:
@@ -114,6 +135,8 @@ def main():
             new_w = max(1, int(w * TARGET_HEIGHT / h))
             img = img.resize((new_w, TARGET_HEIGHT), Image.BILINEAR)
 
+        img = trim_whitespace(img)
+
         chunks = slice_line_image(img)
 
         p0 = name_parts[0]
@@ -127,6 +150,9 @@ def main():
 
         line_part = name_parts[3]
         for ci, chunk in enumerate(chunks):
+            if is_mostly_blank(chunk):
+                blank_skipped += 1
+                continue
             chunk_id = f"{line_part}{ci:02d}"
             chunk_stem = f"{name_parts[0]}-{name_parts[1]}-{name_parts[2]}-{chunk_id}"
             chunk.save(dst_dir / f"{chunk_stem}.png")
@@ -172,27 +198,32 @@ def main():
         "\n".join(test_ids.tolist()), encoding="utf-8"
     )
 
-    all_writer_ids = sorted(set(forms_map.values()))
-    global_writer_dict = {str(w): i for i, w in enumerate(all_writer_ids)}
+    # Build writer dict from ONLY the writers that appear in the training
+    # split so that num_classes matches the actual training data exactly.
+    train_set = set(train_ids.tolist())
+    train_writers = sorted({forms_map[fid] for fid in train_set})
+    train_writer_dict = {str(w): i for i, w in enumerate(train_writers)}
 
     for split_name in ["train", "val", "test"]:
         (out_root / f"writers_dict_{split_name}.json").write_text(
-            json.dumps(global_writer_dict, ensure_ascii=False),
+            json.dumps(train_writer_dict, ensure_ascii=False),
             encoding="utf-8",
         )
 
     print(f"Rows in metafile: {len(rows)}")
     print(f"Line images processed: {len(rows) - missing_images}")
     print(f"Word chunks created: {total_chunks}")
+    print(f"Blank chunks skipped: {blank_skipped}")
     print(f"Missing images: {missing_images}")
     print(f"Forms total: {len(all_form_ids)}")
-    print(f"Writers total: {len(all_writer_ids)}")
+    print(f"Writers total: {len(set(forms_map.values()))}")
     print(f"Train/Val/Test forms: {len(train_ids)}/{len(val_ids)}/{len(test_ids)}")
+    print(f"Writers in training split (num_classes): {len(train_writer_dict)}")
     print(f"Chunk image target height: {TARGET_HEIGHT}px")
     print(f"Wrote: {forms_path}")
     print(f"Wrote: {words_path}")
     print(f"Wrote split files in: {split_dir}")
-    print(f"Wrote global writer dict ({len(global_writer_dict)} writers) to: {out_root.resolve()}")
+    print(f"Wrote writer dict ({len(train_writer_dict)} writers) to: {out_root.resolve()}")
 
 
 if __name__ == "__main__":
