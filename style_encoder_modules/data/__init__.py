@@ -3,6 +3,7 @@ from .io_utils import LineListIO
 from .word_style_dataset import WordStyleDataset
 from .word_line_dataset import WordLineDataset
 from .iam_dataset_style import IAMDataset_style
+from .ukr_dataset_style import UkrDataset_style
 
 __all__ = [
     "image_resize_PIL",
@@ -11,4 +12,5 @@ __all__ = [
     "WordStyleDataset",
     "WordLineDataset",
     "IAMDataset_style",
+    "UkrDataset_style",
 ]
