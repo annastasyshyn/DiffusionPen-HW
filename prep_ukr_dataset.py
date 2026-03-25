@@ -7,8 +7,9 @@ import numpy as np
 from PIL import Image
 
 
-CHUNK_WIDTH = 250
-MIN_CHUNK_WIDTH = 100
+TARGET_HEIGHT = 60
+CHUNK_WIDTH = 192
+MIN_CHUNK_WIDTH = 64
 
 
 def load_metafile(path: Path):
@@ -106,7 +107,13 @@ def main():
             missing_images += 1
             continue
 
-        img = Image.open(src_img)
+        img = Image.open(src_img).convert("RGB")
+
+        w, h = img.size
+        if h > TARGET_HEIGHT:
+            new_w = max(1, int(w * TARGET_HEIGHT / h))
+            img = img.resize((new_w, TARGET_HEIGHT), Image.BILINEAR)
+
         chunks = slice_line_image(img)
 
         p0 = name_parts[0]
@@ -165,20 +172,13 @@ def main():
         "\n".join(test_ids.tolist()), encoding="utf-8"
     )
 
-    split_to_ids = {
-        "train": train_ids.tolist(),
-        "val": val_ids.tolist(),
-        "test": test_ids.tolist(),
-    }
+    all_writer_ids = sorted(set(forms_map.values()))
+    global_writer_dict = {str(w): i for i, w in enumerate(all_writer_ids)}
 
-    def writer_map_from_form_ids(fids):
-        writers = sorted({forms_map[fid] for fid in fids if fid in forms_map})
-        return {str(w): i for i, w in enumerate(writers)}
-
-    for split_name, fids in split_to_ids.items():
-        payload = json.dumps(writer_map_from_form_ids(fids), ensure_ascii=False)
+    for split_name in ["train", "val", "test"]:
         (out_root / f"writers_dict_{split_name}.json").write_text(
-            payload, encoding="utf-8"
+            json.dumps(global_writer_dict, ensure_ascii=False),
+            encoding="utf-8",
         )
 
     print(f"Rows in metafile: {len(rows)}")
@@ -186,11 +186,13 @@ def main():
     print(f"Word chunks created: {total_chunks}")
     print(f"Missing images: {missing_images}")
     print(f"Forms total: {len(all_form_ids)}")
+    print(f"Writers total: {len(all_writer_ids)}")
     print(f"Train/Val/Test forms: {len(train_ids)}/{len(val_ids)}/{len(test_ids)}")
+    print(f"Chunk image target height: {TARGET_HEIGHT}px")
     print(f"Wrote: {forms_path}")
     print(f"Wrote: {words_path}")
     print(f"Wrote split files in: {split_dir}")
-    print(f"Wrote writer maps for train/val/test to: {out_root.resolve()}")
+    print(f"Wrote global writer dict ({len(global_writer_dict)} writers) to: {out_root.resolve()}")
 
 
 if __name__ == "__main__":
