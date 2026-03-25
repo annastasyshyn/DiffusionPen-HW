@@ -104,17 +104,18 @@ def main():
         print(f"len train data {len(train_data)}")
         print(f"len val data {len(val_data)}")
 
+        num_workers = min(2, os.cpu_count() or 1)
         train_loader = DataLoader(
             train_data,
             batch_size=args.batch_size,
             shuffle=True,
-            num_workers=0,
+            num_workers=num_workers,
         )
         val_loader = DataLoader(
             val_data,
             batch_size=args.batch_size,
             shuffle=False,
-            num_workers=0,
+            num_workers=num_workers,
         )
 
         _wr_dict_candidates = [
@@ -167,17 +168,18 @@ def main():
         print(f"len val data {len(val_data)}")
         print(f"style classes (num writers): {style_classes}")
 
+        num_workers = min(2, os.cpu_count() or 1)
         train_loader = DataLoader(
             train_data,
             batch_size=args.batch_size,
             shuffle=True,
-            num_workers=0,
+            num_workers=num_workers,
         )
         val_loader = DataLoader(
             val_data,
             batch_size=args.batch_size,
             shuffle=False,
-            num_workers=0,
+            num_workers=num_workers,
         )
 
     else:

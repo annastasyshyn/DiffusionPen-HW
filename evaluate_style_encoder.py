@@ -15,7 +15,7 @@ from style_encoder_modules.training.mixed import _split_model_output
 
 def evaluate(args):
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
-    num_workers = 0  # dataset is in RAM; forked workers deadlock with NumPy threads
+    num_workers = min(2, os.cpu_count() or 1)
     tfm = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
