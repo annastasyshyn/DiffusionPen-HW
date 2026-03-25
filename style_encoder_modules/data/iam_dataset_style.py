@@ -11,15 +11,15 @@ class IAMDataset_style(WordLineDataset):
     def __init__(self, basefolder, subset, segmentation_level, fixed_size, transforms):
         super().__init__(basefolder, subset, segmentation_level, fixed_size, transforms)
         self.setname = "IAM"
-        self.trainset_file = os.path.join(self.basefolder, "splits", "trainset.txt")
-        self.valset_file = os.path.join(self.basefolder, "splits", "validationset1.txt")
-        self.testset_file = os.path.join(self.basefolder, "splits", "testset.txt")
+        self.trainset_file = os.path.join(self.basefolder, "IAM", "set_split", "trainset.txt")
+        self.valset_file = os.path.join(self.basefolder, "IAM", "set_split", "validationset1.txt")
+        self.testset_file = os.path.join(self.basefolder, "IAM", "set_split", "testset.txt")
         self.line_file = os.path.join(self.basefolder, "ascii", "lines.txt")
-        self.word_file = os.path.join(self.basefolder, "ascii", "words.txt")
+        self.word_file = "./iam_data/ascii/words.txt"
         self.word_path = os.path.join(self.basefolder, "words")
         self.line_path = os.path.join(self.basefolder, "lines")
-        self.forms = os.path.join(self.basefolder, "ascii", "forms.txt")
-        self.split_dir = os.path.join(self.basefolder, "splits")
+        self.forms = "./iam_data/ascii/forms.txt"
+        self.split_dir = "./utils/aachen_iam_split"
         super().__finalize__()
 
     def main_loader(self, subset, segmentation_level) -> list:
@@ -65,10 +65,13 @@ class IAMDataset_style(WordLineDataset):
             form_writer_dict = {}
 
             dict_candidates = [
+                f"./writers_dict_{subset}.json",
                 os.path.join(self.basefolder, f"writers_dict_{subset}.json"),
             ]
             if subset == "val":
                 dict_candidates.extend([
+                    "./writers_dict_test.json",
+                    "./writers_dict_train.json",
                     os.path.join(self.basefolder, "writers_dict_test.json"),
                     os.path.join(self.basefolder, "writers_dict_train.json"),
                 ])
