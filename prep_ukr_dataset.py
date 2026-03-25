@@ -60,7 +60,6 @@ def main():
     parser.add_argument("--metafile", type=str, default="./METAFILE.tsv")
     parser.add_argument("--lines_dir", type=str, default="./lines/lines")
     parser.add_argument("--out_root", type=str, default="./iam_data")
-    parser.add_argument("--split_dir", type=str, default="./utils/aachen_iam_split")
     parser.add_argument("--val_fraction", type=float, default=0.1)
     parser.add_argument("--test_fraction", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=42)
@@ -70,7 +69,7 @@ def main():
     metafile = Path(args.metafile)
     lines_dir = Path(args.lines_dir)
     out_root = Path(args.out_root)
-    split_dir = Path(args.split_dir)
+    split_dir = out_root / "splits"
 
     if not metafile.exists():
         raise FileNotFoundError(f"Missing metafile: {metafile}")
@@ -176,14 +175,11 @@ def main():
         writers = sorted({forms_map[fid] for fid in fids if fid in forms_map})
         return {str(w): i for i, w in enumerate(writers)}
 
-    dict_targets = [Path("."), split_dir]
     for split_name, fids in split_to_ids.items():
         payload = json.dumps(writer_map_from_form_ids(fids), ensure_ascii=False)
-        for target_dir in dict_targets:
-            target_dir.mkdir(parents=True, exist_ok=True)
-            (target_dir / f"writers_dict_{split_name}.json").write_text(
-                payload, encoding="utf-8"
-            )
+        (out_root / f"writers_dict_{split_name}.json").write_text(
+            payload, encoding="utf-8"
+        )
 
     print(f"Rows in metafile: {len(rows)}")
     print(f"Line images processed: {len(rows) - missing_images}")
@@ -194,10 +190,7 @@ def main():
     print(f"Wrote: {forms_path}")
     print(f"Wrote: {words_path}")
     print(f"Wrote split files in: {split_dir}")
-    print(
-        "Wrote writer maps for train/val/test to: "
-        f"{Path('.').resolve()} and {split_dir.resolve()}"
-    )
+    print(f"Wrote writer maps for train/val/test to: {out_root.resolve()}")
 
 
 if __name__ == "__main__":

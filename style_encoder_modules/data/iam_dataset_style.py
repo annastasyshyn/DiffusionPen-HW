@@ -11,23 +11,15 @@ class IAMDataset_style(WordLineDataset):
     def __init__(self, basefolder, subset, segmentation_level, fixed_size, transforms):
         super().__init__(basefolder, subset, segmentation_level, fixed_size, transforms)
         self.setname = "IAM"
-        self.trainset_file = "{}/{}/set_split/trainset.txt".format(
-            self.basefolder, self.setname
-        )
-        self.valset_file = "{}/{}/set_split/validationset1.txt".format(
-            self.basefolder, self.setname
-        )
-        self.testset_file = "{}/{}/set_split/testset.txt".format(
-            self.basefolder, self.setname
-        )
-        self.line_file = "{}/ascii/lines.txt".format(self.basefolder, self.setname)
-        self.word_file = "./iam_data/ascii/words.txt".format(
-            self.basefolder, self.setname
-        )
+        self.trainset_file = os.path.join(self.basefolder, "splits", "trainset.txt")
+        self.valset_file = os.path.join(self.basefolder, "splits", "validationset1.txt")
+        self.testset_file = os.path.join(self.basefolder, "splits", "testset.txt")
+        self.line_file = os.path.join(self.basefolder, "ascii", "lines.txt")
+        self.word_file = os.path.join(self.basefolder, "ascii", "words.txt")
         self.word_path = os.path.join(self.basefolder, "words")
-        self.line_path = "{}/lines".format(self.basefolder, self.setname)
-        self.forms = "./iam_data/ascii/forms.txt"
-        # self.stopwords_path = '{}/{}/iam-stopwords'.format(self.basefolder, self.setname)
+        self.line_path = os.path.join(self.basefolder, "lines")
+        self.forms = os.path.join(self.basefolder, "ascii", "forms.txt")
+        self.split_dir = os.path.join(self.basefolder, "splits")
         super().__finalize__()
 
     def main_loader(self, subset, segmentation_level) -> list:
@@ -46,20 +38,16 @@ class IAMDataset_style(WordLineDataset):
                 return value
 
             if subset == "train":
-                # valid_set = np.loadtxt(self.trainset_file, dtype=str)
                 valid_set = np.loadtxt(
-                    "./utils/aachen_iam_split/train_val.uttlist", dtype=str
+                    os.path.join(self.split_dir, "train_val.uttlist"), dtype=str
                 )
-                # print(valid_set)
             elif subset == "val":
-                # valid_set = np.loadtxt(self.valset_file, dtype=str)
                 valid_set = np.loadtxt(
-                    "./utils/aachen_iam_split/validation.uttlist", dtype=str
+                    os.path.join(self.split_dir, "validation.uttlist"), dtype=str
                 )
             elif subset == "test":
-                # valid_set = np.loadtxt(self.testset_file, dtype=str)
                 valid_set = np.loadtxt(
-                    "./utils/aachen_iam_split/test.uttlist", dtype=str
+                    os.path.join(self.split_dir, "test.uttlist"), dtype=str
                 )
             else:
                 raise ValueError
@@ -76,11 +64,14 @@ class IAMDataset_style(WordLineDataset):
             gt = []
             form_writer_dict = {}
 
-            dict_candidates = [f"./writers_dict_{subset}.json"]
+            dict_candidates = [
+                os.path.join(self.basefolder, f"writers_dict_{subset}.json"),
+            ]
             if subset == "val":
-                dict_candidates.extend(
-                    ["./writers_dict_test.json", "./writers_dict_train.json"]
-                )
+                dict_candidates.extend([
+                    os.path.join(self.basefolder, "writers_dict_test.json"),
+                    os.path.join(self.basefolder, "writers_dict_train.json"),
+                ])
             dict_path = next(
                 (p for p in dict_candidates if os.path.exists(p)),
                 None,

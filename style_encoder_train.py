@@ -80,6 +80,7 @@ def main():
     parser.add_argument(
         "--val_fraction", type=float, default=0.2, help="fraction of data for validation"
     )
+    parser.add_argument("--lr", type=float, default=1e-3, help="initial learning rate")
     args = parser.parse_args()
 
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
@@ -132,7 +133,7 @@ def main():
             num_workers=num_workers,
         )
 
-        with open("writers_dict_train.json") as _f:
+        with open(os.path.join(dataset_folder, "writers_dict_train.json")) as _f:
             style_classes = len(json.load(_f))
 
     else:
@@ -168,7 +169,7 @@ def main():
 
     model = model.to(device)
     # print(model)
-    optimizer = optim.Adam(model.parameters(), lr=3e-4, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=args.epochs, eta_min=1e-6
     )
