@@ -15,12 +15,9 @@ def train_epoch_triplet(train_loader, model, criterion, optimizer, device, args)
     for i, data in enumerate(pbar):
 
         img = data[0]
-
-        if args.dataset == "iam":
-            wid = data[2]
-            # print('wid', wid)
-            positive = data[3]
-            negative = data[4]
+        wid = data[3]
+        positive = data[4]
+        negative = data[5]
 
         anchor = img.to(device)
         positive = positive.to(device)
@@ -36,9 +33,7 @@ def train_epoch_triplet(train_loader, model, criterion, optimizer, device, args)
         loss.backward()
         optimizer.step()
 
-        # running_loss.append(loss.cpu().detach().numpy())
         running_loss += loss.item()
-        # pbar.set_postfix(triplet_loss=loss.item())
         count = img.size(0)
         loss_meter.update(loss.item(), count)
         pbar.set_postfix(triplet_loss=loss_meter.avg)
@@ -57,12 +52,9 @@ def val_epoch_triplet(val_loader, model, criterion, optimizer, device, args):
     for i, data in enumerate(pbar):
 
         img = data[0]
-        # transcr = data[1]
-
-        if args.dataset == "iam":
-            wid = data[2]
-            positive = data[3]
-            negative = data[4]
+        wid = data[3]
+        positive = data[4]
+        negative = data[5]
 
         anchor = img.to(device)
         positive = positive.to(device)
@@ -109,7 +101,7 @@ def train_triplet(
                     f"{args.save_path}/triplet_{args.dataset}_{args.model}.pth",
                 )
 
-            scheduler.step()
+            scheduler.step(val_loss)
         else:
             torch.save(
                 model.state_dict(),

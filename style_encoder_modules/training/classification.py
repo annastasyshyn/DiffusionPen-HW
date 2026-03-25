@@ -17,8 +17,7 @@ def train_class_epoch(model, training_data, optimizer, args):
     for i, data in enumerate(pbar):
 
         image = data[0].to(args.device)
-        if args.dataset == "iam":
-            label = data[2].to(args.device)
+        label = data[3].to(args.device).long()
 
         optimizer.zero_grad()
 
@@ -54,9 +53,8 @@ def eval_class_epoch(model, validation_data, args):
         for i, data in enumerate(tqdm(validation_data)):
 
             image = data[0].to(args.device)
-            image_paths = data[4]
-            if args.dataset == "iam":
-                label = data[2].to(args.device)
+            image_paths = data[8]
+            label = data[3].to(args.device).long()
 
             output = model(image)
 
@@ -137,6 +135,5 @@ def train_classification(
                 f"{args.save_path}/{args.dataset}_classification_{args.model}.pth",
             )
 
-        scheduler.step()
-        # wandb.log({'epoch': epoch_i, 'train loss': train_loss, 'val loss': val_loss})
-        # wandb.log({'epoch': epoch_i, 'train acc': 100*train_acc, 'val acc': 100*val_acc})
+        step_metric = val_loss if validation_data is not None else train_loss
+        scheduler.step(step_metric)

@@ -1,4 +1,5 @@
 import torch
+from collections import defaultdict
 from torch.utils.data import Dataset
 import numpy as np
 from os.path import isfile
@@ -40,7 +41,7 @@ class WordLineDataset(Dataset):
         self.stopwords_path = None
         self.character_classes = character_classes
         self.max_transcr_len = 0
-        # self.processor = TrOCRProcessor.from_pretrained("microsoft/trocr-base-handwritten", )
+        self.augment = (subset == "train")
 
     def __finalize__(self):
         """
@@ -92,7 +93,16 @@ class WordLineDataset(Dataset):
             print("Max transcription length: {}".format(self.max_transcr_len))
             self.character_classes = res
             self.max_transcr_len = self.max_transcr_len
-        # END FINALIZE
+
+        self._writer_to_indices = defaultdict(list)
+        self._writer_to_indices_long = defaultdict(list)
+        all_wids = set()
+        for idx, (_, transcr, wid, _) in enumerate(self.data):
+            all_wids.add(wid)
+            self._writer_to_indices[wid].append(idx)
+            if len(transcr) > 3:
+                self._writer_to_indices_long[wid].append(idx)
+        self._all_writer_ids = sorted(all_wids)
 
     def __len__(self):
         return len(self.data)
@@ -106,36 +116,32 @@ class WordLineDataset(Dataset):
         wid = self.data[index][2]
 
         img_path = self.data[index][3]
-        # pick another sample that has the same self.data[2] or same writer id
-        positive_samples = [p for p in self.data if p[2] == wid and len(p[1]) > 3]
-        negative_samples = [n for n in self.data if n[2] != wid and len(n[1]) > 3]
 
-        positive = random.choice(positive_samples)[0]
+        pos_long = self._writer_to_indices_long.get(wid, [])
+        pos_all = self._writer_to_indices[wid]
 
-        # Make sure you have at least 5 matching images
-        if len(positive_samples) >= 5:
-            # Randomly select 5 indices from the matching_indices
-            random_samples = random.sample(positive_samples, k=5)
-            # Retrieve the corresponding images
-            style_images = [i[0] for i in random_samples]
+        pos_pool = pos_long if pos_long else pos_all
+        positive = self.data[random.choice(pos_pool)][0]
+
+        if len(pos_pool) >= 5:
+            style_indices = random.sample(pos_pool, k=5)
         else:
-            # Handle the case where there are fewer than 5 matching images (if needed)
-            # print("Not enough matching images with writer ID", wid)
-            positive_samples_ = [p for p in self.data if p[2] == wid]
-            # print('len positive samples', len(positive_samples_), 'wid', wid)
-            random_samples_ = random.sample(positive_samples_, k=5)
-            # Retrieve the corresponding images
-            style_images = [i[0] for i in random_samples_]
+            style_indices = random.choices(pos_all, k=5)
+        style_images = [self.data[si][0] for si in style_indices]
 
-        # pick another image from a different writer
-        negative = random.choice(negative_samples)[0]
+        neg_wid = wid
+        while neg_wid == wid:
+            neg_wid = random.choice(self._all_writer_ids)
+        neg_pool = self._writer_to_indices_long.get(neg_wid, [])
+        if not neg_pool:
+            neg_pool = self._writer_to_indices[neg_wid]
+        negative = self.data[random.choice(neg_pool)][0]
 
         img_pos = positive  # image_resize_PIL(positive, height=positive.height // 2)
         img_neg = negative  # image_resize_PIL(negative, height=negative.height // 2)
 
         fheight, fwidth = self.fixed_size[0], self.fixed_size[1]
-        # print('fheight', fheight, 'fwidth', fwidth)
-        if self.subset == "train":
+        if self.augment:
             nwidth = int(np.random.uniform(0.75, 1.25) * img.width)
             nheight = int(
                 (np.random.uniform(0.9, 1.1) * img.height / img.width) * nwidth
@@ -196,8 +202,7 @@ class WordLineDataset(Dataset):
 
         st_imgs = []
         for s_im in style_images:
-            # s_im = image_resize_PIL(s_im, height=s_im.height // 2)
-            if self.subset == "train":
+            if self.augment:
                 nwidth = int(np.random.uniform(0.75, 1.25) * s_im.width)
                 nheight = int(
                     (np.random.uniform(0.9, 1.1) * s_im.height / s_im.width) * nwidth

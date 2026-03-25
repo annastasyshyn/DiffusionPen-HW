@@ -194,10 +194,10 @@ def train_mixed(
                     f"{args.save_path}/mixed_{args.dataset}_{args.model}.pth",
                 )
 
-            scheduler.step()
+            scheduler.step(val_loss)
         else:
             torch.save(
                 model.state_dict(),
                 f"{args.save_path}/mixed_{args.dataset}_{args.model}.pth",
             )
-            scheduler.step()
+            scheduler.step(train_loss)

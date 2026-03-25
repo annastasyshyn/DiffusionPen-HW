@@ -3,18 +3,37 @@ import json
 import torch
 import torch.nn as nn
 from torchvision import transforms
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Dataset, random_split
 import os
 import argparse
 import torch.optim as optim
-from utils.auxilary_functions import affine_transformation
 from feature_extractor import ImageEncoder
 from style_encoder_modules.data import IAMDataset_style
 from style_encoder_modules.training import (
     train_mixed,
     train_classification,
     train_triplet as train,
+    Mixed_Encoder,
 )
+
+
+class _NoAugSubset(Dataset):
+    """Wraps a random_split Subset and disables geometric augmentation."""
+
+    def __init__(self, subset):
+        self._subset = subset
+
+    def __len__(self):
+        return len(self._subset)
+
+    def __getitem__(self, index):
+        ds = self._subset.dataset
+        old = ds.augment
+        ds.augment = False
+        try:
+            return self._subset[index]
+        finally:
+            ds.augment = old
 
 
 def main():
@@ -89,10 +108,11 @@ def main():
 
         n_val = int(len(full_data) * args.val_fraction)
         n_train = len(full_data) - n_val
-        train_data, val_data = random_split(
+        train_data, val_data_raw = random_split(
             full_data, [n_train, n_val],
             generator=torch.Generator().manual_seed(args.split_seed),
         )
+        val_data = _NoAugSubset(val_data_raw)
 
         print(f"len full data {len(full_data)}")
         print(f"len train data {len(train_data)}")
@@ -120,68 +140,37 @@ def main():
             "You need to add your own dataset and define the number of style classes!!!"
         )
 
-    if args.model == "mobilenetv2_100":
-        print("Using mobilenetv2_100")
-        model = ImageEncoder(
-            model_name="mobilenetv2_100",
-            num_classes=style_classes,
-            pretrained=True,
-            trainable=True,
+    encoder_cls = Mixed_Encoder if args.mode == "mixed" else ImageEncoder
+    print(f"Using {args.model} with {encoder_cls.__name__}")
+    model = encoder_cls(
+        model_name=args.model,
+        num_classes=style_classes,
+        pretrained=True,
+        trainable=True,
+    )
+    print(
+        "Number of model parameters: {}".format(
+            sum([p.data.nelement() for p in model.parameters()])
         )
-        print(
-            "Number of model parameters: {}".format(
-                sum([p.data.nelement() for p in model.parameters()])
-            )
-        )
-        if args.pretrained == True:
-
-            state_dict = torch.load(PATH, map_location=args.device)
-            model_dict = model.state_dict()
-            state_dict = {
-                k: v
-                for k, v in state_dict.items()
-                if k in model_dict and model_dict[k].shape == v.shape
-            }
-            model_dict.update(state_dict)
-            model.load_state_dict(model_dict)
-            # print(model)
-            print("Pretrained mobilenetv2_100 model loaded")
-
-    if args.model == "resnet18":
-        print("Using resnet18")
-        model = ImageEncoder(
-            model_name=args.model,
-            num_classes=style_classes,
-            pretrained=True,
-            trainable=True,
-        )
-        print("Model loaded")
-        # change layer to have 1 channel instead of 3
-        # model.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        print(
-            "Number of model parameters: {}".format(
-                sum([p.data.nelement() for p in model.parameters()])
-            )
-        )
-        if args.pretrained == True:
-            PATH = ""
-
-            state_dict = torch.load(PATH, map_location=args.device)
-            model_dict = model.state_dict()
-            state_dict = {
-                k: v
-                for k, v in state_dict.items()
-                if k in model_dict and model_dict[k].shape == v.shape
-            }
-            model_dict.update(state_dict)
-            model.load_state_dict(model_dict)
+    )
+    if args.pretrained == True:
+        PATH = ""
+        state_dict = torch.load(PATH, map_location=args.device)
+        model_dict = model.state_dict()
+        state_dict = {
+            k: v
+            for k, v in state_dict.items()
+            if k in model_dict and model_dict[k].shape == v.shape
+        }
+        model_dict.update(state_dict)
+        model.load_state_dict(model_dict)
+        print("Pretrained model loaded")
 
     model = model.to(device)
     # print(model)
-    optimizer_ft = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=3, gamma=0.1)
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer_ft, mode="min", patience=3, factor=0.1
+    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", patience=3, factor=0.1
     )
     criterion = nn.TripletMarginLoss(margin=1.0, p=2)
 
@@ -195,7 +184,7 @@ def main():
             val_loader,
             criterion_triplet,
             None,
-            optimizer_ft,
+            optimizer,
             scheduler,
             device,
             args,
@@ -208,8 +197,8 @@ def main():
             train_loader,
             val_loader,
             criterion,
-            optimizer_ft,
-            lr_scheduler,
+            optimizer,
+            scheduler,
             device,
             args,
         )
@@ -218,7 +207,7 @@ def main():
     elif args.mode == "classification":
 
         train_classification(
-            model, train_loader, val_loader, optimizer_ft, scheduler, device, args
+            model, train_loader, val_loader, optimizer, scheduler, device, args
         )
         print("finished training")
 
