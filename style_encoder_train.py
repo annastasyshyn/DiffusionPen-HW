@@ -3,7 +3,7 @@ import json
 import torch
 import torch.nn as nn
 from torchvision import transforms
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader
 import os
 import argparse
 import torch.optim as optim
@@ -16,24 +16,6 @@ from style_encoder_modules.training import (
     Mixed_Encoder,
 )
 
-
-class _NoAugSubset(Dataset):
-    """Wraps a random_split Subset and disables geometric augmentation."""
-
-    def __init__(self, subset):
-        self._subset = subset
-
-    def __len__(self):
-        return len(self._subset)
-
-    def __getitem__(self, index):
-        ds = self._subset.dataset
-        old = ds.augment
-        ds.augment = False
-        try:
-            return self._subset[index]
-        finally:
-            ds.augment = old
 
 
 def main():
@@ -103,7 +85,7 @@ def main():
             ]
         )
 
-        full_data = IAMDataset_style(
+        train_data = IAMDataset_style(
             dataset_folder,
             "train",
             "word",
@@ -111,15 +93,14 @@ def main():
             transforms=train_transform,
         )
 
-        n_val = int(len(full_data) * args.val_fraction)
-        n_train = len(full_data) - n_val
-        train_data, val_data_raw = random_split(
-            full_data, [n_train, n_val],
-            generator=torch.Generator().manual_seed(args.split_seed),
+        val_data = IAMDataset_style(
+            dataset_folder,
+            "val",
+            "word",
+            fixed_size=(64, 256),
+            transforms=train_transform,
         )
-        val_data = _NoAugSubset(val_data_raw)
 
-        print(f"len full data {len(full_data)}")
         print(f"len train data {len(train_data)}")
         print(f"len val data {len(val_data)}")
 
@@ -161,7 +142,11 @@ def main():
             ]
         )
 
-        full_data = UkrDataset_style(
+        # Load train and val as separate instances split at the form boundary.
+        # This avoids the data leakage that occurs when random_split is applied
+        # at the chunk level: adjacent chunks from the same handwritten line would
+        # end up on both sides of the split.
+        train_data = UkrDataset_style(
             dataset_folder,
             "train",
             "word",
@@ -171,17 +156,18 @@ def main():
             val_fraction=args.val_fraction,
         )
 
-        style_classes = full_data.num_writers
-
-        n_val = int(len(full_data) * args.val_fraction)
-        n_train = len(full_data) - n_val
-        train_data, val_data_raw = random_split(
-            full_data, [n_train, n_val],
-            generator=torch.Generator().manual_seed(args.split_seed),
+        val_data = UkrDataset_style(
+            dataset_folder,
+            "val",
+            "word",
+            fixed_size=(64, 256),
+            transforms=train_transform,
+            split_seed=args.split_seed,
+            val_fraction=args.val_fraction,
         )
-        val_data = _NoAugSubset(val_data_raw)
 
-        print(f"len full data {len(full_data)}")
+        style_classes = train_data.num_writers
+
         print(f"len train data {len(train_data)}")
         print(f"len val data {len(val_data)}")
         print(f"style classes (num writers): {style_classes}")

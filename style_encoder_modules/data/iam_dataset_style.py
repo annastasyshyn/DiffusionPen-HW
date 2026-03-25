@@ -39,7 +39,7 @@ class IAMDataset_style(WordLineDataset):
 
             if subset == "train":
                 valid_set = np.loadtxt(
-                    os.path.join(self.split_dir, "train_val.uttlist"), dtype=str
+                    os.path.join(self.split_dir, "train.uttlist"), dtype=str
                 )
             elif subset == "val":
                 valid_set = np.loadtxt(
