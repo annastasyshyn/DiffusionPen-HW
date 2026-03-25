@@ -75,9 +75,9 @@ class UkrDataset_style(WordLineDataset):
         for fn, _ in rows:
             stem = os.path.splitext(fn)[0]
             parts = stem.split("-")
-            if len(parts) >= 2:
-                form_id = f"{parts[0]}-{parts[1]}"
-                forms_map.setdefault(form_id, parts[1])
+            if len(parts) >= 3:
+                form_id = f"{parts[0]}-{parts[1]}-{parts[2]}"
+                forms_map.setdefault(form_id, parts[2])
 
         all_forms = sorted(forms_map.keys())
         rng = np.random.default_rng(self.split_seed)
@@ -108,11 +108,11 @@ class UkrDataset_style(WordLineDataset):
             if len(parts) < 4:
                 continue
 
-            form_id = f"{parts[0]}-{parts[1]}"
+            form_id = f"{parts[0]}-{parts[1]}-{parts[2]}"
             if form_id not in keep:
                 continue
 
-            writer_id = parts[1]
+            writer_id = parts[2]
             if writer_id not in writer_to_label:
                 continue
             label = writer_to_label[writer_id]
