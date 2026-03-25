@@ -168,9 +168,9 @@ def main():
 
     model = model.to(device)
     # print(model)
-    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", patience=3, factor=0.1
+    optimizer = optim.Adam(model.parameters(), lr=3e-4, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=args.epochs, eta_min=1e-6
     )
     criterion = nn.TripletMarginLoss(margin=1.0, p=2)
 

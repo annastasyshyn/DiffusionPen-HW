@@ -67,11 +67,10 @@ def train_epoch_mixed(
 
         optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
         optimizer.step()
 
-        # running_loss.append(loss.cpu().detach().numpy())
         running_loss += loss.item()
-        # pbar.set_postfix(triplet_loss=loss.item())
         count = img.size(0)
         loss_meter.update(loss.item(), count)
         loss_meter_triplet.update(triplet_loss.item(), count)
@@ -99,6 +98,9 @@ def val_epoch_mixed(
     device,
     args,
 ):
+    import random as _random
+    rng_state = _random.getstate()
+    _random.seed(42)
 
     running_loss = 0
     total = 0
@@ -140,6 +142,8 @@ def val_epoch_mixed(
         loss_meter.update(loss.item(), count)
         pbar.set_postfix(mixed_loss=loss_meter.avg)
         total += wid.size(0)
+
+    _random.setstate(rng_state)
 
     print("total", total)
     accuracy = n_corrects / total
@@ -194,10 +198,10 @@ def train_mixed(
                     f"{args.save_path}/mixed_{args.dataset}_{args.model}.pth",
                 )
 
-            scheduler.step(val_loss)
+            scheduler.step()
         else:
             torch.save(
                 model.state_dict(),
                 f"{args.save_path}/mixed_{args.dataset}_{args.model}.pth",
             )
-            scheduler.step(train_loss)
+            scheduler.step()
