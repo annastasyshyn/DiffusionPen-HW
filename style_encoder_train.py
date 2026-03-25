@@ -137,7 +137,17 @@ def main():
             num_workers=num_workers,
         )
 
-        with open(os.path.join(dataset_folder, "writers_dict_train.json")) as _f:
+        _wr_dict_candidates = [
+            "./writers_dict_train.json",
+            os.path.join(dataset_folder, "writers_dict_train.json"),
+        ]
+        _wr_dict_path = next((p for p in _wr_dict_candidates if os.path.exists(p)), None)
+        if _wr_dict_path is None:
+            raise FileNotFoundError(
+                "Could not find writers_dict_train.json. Tried: "
+                + ", ".join(_wr_dict_candidates)
+            )
+        with open(_wr_dict_path) as _f:
             style_classes = len(json.load(_f))
 
     elif args.dataset == "ukr":
