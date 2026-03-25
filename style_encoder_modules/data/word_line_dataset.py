@@ -235,12 +235,11 @@ class WordLineDataset(Dataset):
             img_neg = self.transforms(img_neg)
 
         char_tokens = [self.character_classes.index(c) for c in transcr]
-        # print('char_tokens before', char_tokens)
-        pad_token = 79
-
-        # padding_length = self.max_transcr_len - len(char_tokens)
-        padding_length = 95 - len(char_tokens)
-        char_tokens.extend([pad_token] * padding_length)
+        pad_token = len(self.character_classes)
+        max_len = max(self.max_transcr_len, 95)
+        padding_length = max_len - len(char_tokens)
+        if padding_length > 0:
+            char_tokens.extend([pad_token] * padding_length)
 
         # char_tokens += [pad_token] * (self.max_transcr_len - len(char_tokens))
         char_tokens = torch.tensor(char_tokens, dtype=torch.long)
