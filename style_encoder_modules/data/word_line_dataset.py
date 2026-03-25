@@ -71,10 +71,14 @@ class WordLineDataset(Dataset):
         self.data = data
         # print('data', self.data)
 
-        writer_ids, _ = np.unique([d[2] for d in data], return_inverse=True)
+        writer_ids, inverse = np.unique([d[2] for d in data], return_inverse=True)
 
         self.writer_ids = writer_ids
         self.wclasses = len(writer_ids)
+        self.data = [
+            (img, transcr, int(inverse[i]), path)
+            for i, (img, transcr, _, path) in enumerate(data)
+        ]
         print("Number of writers", self.wclasses)
         if self.character_classes is None:
             res = set()
