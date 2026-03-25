@@ -8,7 +8,8 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 
 from feature_extractor import ImageEncoder
-from style_encoder_modules.data import IAMDataset_style
+from style_encoder_modules.data import IAMDataset_style, UkrDataset_style
+from style_encoder_modules.training import Mixed_Encoder
 from style_encoder_modules.training.mixed import _split_model_output
 
 
@@ -19,13 +20,27 @@ def evaluate(args):
         [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
 
-    full_ds = IAMDataset_style(
-        args.data_root,
-        "train",
-        "word",
-        fixed_size=(64, 256),
-        transforms=tfm,
-    )
+    if args.dataset == "ukr":
+        full_ds = UkrDataset_style(
+            args.data_root,
+            "train",
+            "word",
+            fixed_size=(64, 256),
+            transforms=tfm,
+            split_seed=args.split_seed,
+            val_fraction=args.val_fraction,
+        )
+        num_classes = full_ds.num_writers
+    else:
+        full_ds = IAMDataset_style(
+            args.data_root,
+            "train",
+            "word",
+            fixed_size=(64, 256),
+            transforms=tfm,
+        )
+        with open(os.path.join(args.data_root, "writers_dict_train.json")) as _f:
+            num_classes = len(json.load(_f))
 
     n_val = int(len(full_ds) * args.val_fraction)
     n_train = len(full_ds) - n_val
@@ -45,10 +60,8 @@ def evaluate(args):
         num_workers=num_workers,
     )
 
-    with open("writers_dict_train.json") as _f:
-        num_classes = len(json.load(_f))
-
-    model = ImageEncoder(
+    encoder_cls = Mixed_Encoder if args.mode == "mixed" else ImageEncoder
+    model = encoder_cls(
         model_name=args.model,
         num_classes=num_classes,
         pretrained=False,
@@ -99,8 +112,10 @@ def evaluate(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_root", type=str)
+    parser.add_argument("--dataset", type=str, default="iam", choices=["iam", "ukr"])
     parser.add_argument("--checkpoint", type=str)
     parser.add_argument("--model", type=str, default="mobilenetv2_100")
+    parser.add_argument("--mode", type=str, default="mixed", choices=["mixed", "triplet", "classification"])
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument(
