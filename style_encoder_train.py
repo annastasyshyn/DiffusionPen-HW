@@ -3,7 +3,7 @@ import json
 import torch
 import torch.nn as nn
 from torchvision import transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset, random_split
 import os
 import argparse
 import torch.optim as optim
@@ -16,6 +16,24 @@ from style_encoder_modules.training import (
     Mixed_Encoder,
 )
 
+
+class _NoAugSubset(Dataset):
+    """Wraps a random_split Subset and disables geometric augmentation."""
+
+    def __init__(self, subset):
+        self._subset = subset
+
+    def __len__(self):
+        return len(self._subset)
+
+    def __getitem__(self, index):
+        ds = self._subset.dataset
+        old = ds.augment
+        ds.augment = False
+        try:
+            return self._subset[index]
+        finally:
+            ds.augment = old
 
 
 def main():
@@ -85,7 +103,7 @@ def main():
             ]
         )
 
-        train_data = IAMDataset_style(
+        full_data = IAMDataset_style(
             dataset_folder,
             "train",
             "word",
@@ -93,14 +111,15 @@ def main():
             transforms=train_transform,
         )
 
-        val_data = IAMDataset_style(
-            dataset_folder,
-            "val",
-            "word",
-            fixed_size=(64, 256),
-            transforms=train_transform,
+        n_val = int(len(full_data) * args.val_fraction)
+        n_train = len(full_data) - n_val
+        train_data, val_data_raw = random_split(
+            full_data, [n_train, n_val],
+            generator=torch.Generator().manual_seed(args.split_seed),
         )
+        val_data = _NoAugSubset(val_data_raw)
 
+        print(f"len full data {len(full_data)}")
         print(f"len train data {len(train_data)}")
         print(f"len val data {len(val_data)}")
 
@@ -118,8 +137,18 @@ def main():
             num_workers=num_workers,
         )
 
-        style_classes = train_data.wclasses
-        print(f"style classes (unique writers in train split): {style_classes}")
+        _wr_dict_candidates = [
+            "./writers_dict_train.json",
+            os.path.join(dataset_folder, "writers_dict_train.json"),
+        ]
+        _wr_dict_path = next((p for p in _wr_dict_candidates if os.path.exists(p)), None)
+        if _wr_dict_path is None:
+            raise FileNotFoundError(
+                "Could not find writers_dict_train.json. Tried: "
+                + ", ".join(_wr_dict_candidates)
+            )
+        with open(_wr_dict_path) as _f:
+            style_classes = len(json.load(_f))
 
     elif args.dataset == "ukr":
 
@@ -132,7 +161,7 @@ def main():
             ]
         )
 
-        train_data = UkrDataset_style(
+        full_data = UkrDataset_style(
             dataset_folder,
             "train",
             "word",
@@ -142,18 +171,17 @@ def main():
             val_fraction=args.val_fraction,
         )
 
-        val_data = UkrDataset_style(
-            dataset_folder,
-            "val",
-            "word",
-            fixed_size=(64, 256),
-            transforms=train_transform,
-            split_seed=args.split_seed,
-            val_fraction=args.val_fraction,
+        style_classes = full_data.num_writers
+
+        n_val = int(len(full_data) * args.val_fraction)
+        n_train = len(full_data) - n_val
+        train_data, val_data_raw = random_split(
+            full_data, [n_train, n_val],
+            generator=torch.Generator().manual_seed(args.split_seed),
         )
+        val_data = _NoAugSubset(val_data_raw)
 
-        style_classes = train_data.num_writers
-
+        print(f"len full data {len(full_data)}")
         print(f"len train data {len(train_data)}")
         print(f"len val data {len(val_data)}")
         print(f"style classes (num writers): {style_classes}")

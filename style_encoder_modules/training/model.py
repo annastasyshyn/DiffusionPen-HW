@@ -3,6 +3,9 @@ import timm
 
 
 class Mixed_Encoder(nn.Module):
+    """
+    Encode images to a fixed size vector
+    """
 
     def __init__(
         self, model_name="resnet50", num_classes=339, pretrained=True, trainable=True
@@ -11,18 +14,15 @@ class Mixed_Encoder(nn.Module):
         self.model = timm.create_model(
             model_name, pretrained, num_classes=0, global_pool=""
         )
+        # Add a global average pooling layer
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
 
+        # Create the classifier
         if hasattr(self.model, "num_features"):
             num_features = self.model.num_features
         else:
+            # Fallback, can be adjusted based on the specific model
             num_features = 2048
-
-        self.projection = nn.Sequential(
-            nn.Linear(num_features, num_features),
-            nn.LayerNorm(num_features),
-            nn.ReLU(inplace=True),
-        )
 
         self.classifier = nn.Linear(num_features, num_classes)
 
@@ -30,10 +30,14 @@ class Mixed_Encoder(nn.Module):
             p.requires_grad = trainable
 
     def forward(self, x):
+        # Extract features
         features = self.model(x)
-        embedding = self.global_pool(features).flatten(1)  
 
-        projected = self.projection(embedding)  
-        logits = self.classifier(projected)
+        # Pool the features to make them of fixed size
+        pooled_features = self.global_pool(features).flatten(1)
 
-        return logits, embedding
+        # Classify
+        logits = self.classifier(pooled_features)
+        # print('logits', logits.shape)
+        # print('pooled_features', pooled_features.shape)
+        return logits, pooled_features

@@ -4,7 +4,7 @@ import os
 
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 
 from feature_extractor import ImageEncoder
@@ -21,7 +21,7 @@ def evaluate(args):
     )
 
     if args.dataset == "ukr":
-        train_ds = UkrDataset_style(
+        full_ds = UkrDataset_style(
             args.data_root,
             "train",
             "word",
@@ -30,22 +30,11 @@ def evaluate(args):
             split_seed=args.split_seed,
             val_fraction=args.val_fraction,
         )
-        
-        val_ds = UkrDataset_style(
-            args.data_root,
-            "val",
-            "word",
-            fixed_size=(64, 256),
-            transforms=tfm,
-            split_seed=args.split_seed,
-            val_fraction=args.val_fraction,
-        )
-        num_classes = train_ds.num_writers
+        num_classes = full_ds.num_writers
     else:
-        
-        val_ds = IAMDataset_style(
+        full_ds = IAMDataset_style(
             args.data_root,
-            "val",
+            "train",
             "word",
             fixed_size=(64, 256),
             transforms=tfm,
@@ -53,6 +42,12 @@ def evaluate(args):
         with open(os.path.join(args.data_root, "writers_dict_train.json")) as _f:
             num_classes = len(json.load(_f))
 
+    n_val = int(len(full_ds) * args.val_fraction)
+    n_train = len(full_ds) - n_val
+    _, val_ds = random_split(
+        full_ds, [n_train, n_val],
+        generator=torch.Generator().manual_seed(args.split_seed),
+    )
     print(f"Validation samples: {len(val_ds)}")
 
     if len(val_ds) == 0:
